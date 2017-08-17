@@ -324,136 +324,49 @@ class TemplateProcessor
      *
      * @return string|null
      */
-    
-    public function cloneBlock($blockname, $clones = 1, $replace = true)
-    {
+     public function cloneBlock($blockname, $clones = 1, $replace = true, $increment = false) {      
+        $pattern = '|\{(' . $blockname . ')\}(.*)\{(/' . $blockname . ')\}|U';
         $xmlBlock = null;
-        
-        $matches = $this->findBlock($blockname);
-        
-        if (isset($matches[1]))
-        {
-            $xmlBlock = $matches[1];
+        preg_match(
+                $pattern, $this->tempDocumentMainPart, $matches
+        );
+ 
+        if (isset($matches[2])) {
+            $xmlBlock = $matches[2];
             $cloned = array();
-            for ($i = 1; $i <= $clones; $i++)
-            {
-                $cloned[] = preg_replace('/\${(.*?)}/','${$1_'.$i.'}', $xmlBlock);
+            for ($i = 0; $i < $clones; $i++) {
+ 
+                if ($increment) {
+                    $patternInc = '|\$\{([^\}]+)\}|U';
+                    preg_match_all(
+                            $patternInc, $xmlBlock, $matchesInc
+                    );
+ 
+                    $searchVar = array();
+                    $replaceVar = array();
+                    for ($j = 0; $j < count($matchesInc[1]); $j++) {
+                        $searchVar[] = $matchesInc[0][$j];
+                        $replaceVar[] = utf8_encode('${'.$matchesInc[1][$j].'#'.$i.'}');
+                    }
+ 
+                    $tmpXML = str_replace($searchVar,$replaceVar,$xmlBlock);
+                    $cloned[] = $tmpXML;                    
+                }
+                else {
+                    $cloned[] = $xmlBlock;
+                }
             }
-            if ($replace)
-            {
-                $this->tempDocumentMainPart = str_replace
-                (
-                    $matches[0],
-                    implode('', $cloned),
-                    $this->tempDocumentMainPart
+ 
+            if ($replace) {
+                $this->tempDocumentMainPart = str_replace(
+                        $matches[0]
+                        , implode('', $cloned), $this->tempDocumentMainPart
                 );
             }
         }
+ 
         return $xmlBlock;
     }
-    private function findBlock($blockname)
-    {
-        // Parse the XML
-        $xml = new \SimpleXMLElement($this->tempDocumentMainPart);
-        
-        // Find the starting and ending tags
-        $startNode = false; $endNode = false;
-        foreach ($xml->xpath('//w:t') as $node)
-        {
-            if (strpos($node, '{'.$blockname.'}') !== false)
-            {
-                $startNode = $node;
-                continue;
-            }
-        
-            if (strpos($node, '{/'.$blockname.'}') !== false)
-            {
-                $endNode = $node;
-                break;
-            }
-        }
-        
-        // Make sure we found the tags
-        if ($startNode === false || $endNode === false)
-        {
-            return null;
-        }
-        
-        // Find the parent <w:p> node for the start tag
-        $node = $startNode; $startNode = null;
-        while (is_null($startNode))
-        {
-            $node = $node->xpath('..')[0];
-        
-            if ($node->getName() == 'p')
-            {
-                $startNode = $node;
-            }
-        }
-        
-        // Find the parent <w:p> node for the end tag
-        $node = $endNode; $endNode = null;
-        while (is_null($endNode))
-        {
-            $node = $node->xpath('..')[0];
-        
-            if ($node->getName() == 'p')
-            {
-                $endNode = $node;
-            }
-        }
-        
-        /*
-         * NOTE: Because SimpleXML reduces empty tags to "self-closing" tags.
-         * We need to replace the original XML with the version of XML as
-         * SimpleXML sees it. The following example should show the issue
-         * we are facing.
-         *
-         * This is the XML that my document contained orginally.
-         *
-         * ```xml
-         *  <w:p>
-         *      <w:pPr>
-         *          <w:pStyle w:val="TextBody"/>
-         *          <w:rPr></w:rPr>
-         *      </w:pPr>
-         *      <w:r>
-         *          <w:rPr></w:rPr>
-         *          <w:t>${CLONEME}</w:t>
-         *      </w:r>
-         *  </w:p>
-         * ```
-         *
-         * This is the XML that SimpleXML returns from asXml().
-         *
-         * ```xml
-         *  <w:p>
-         *      <w:pPr>
-         *          <w:pStyle w:val="TextBody"/>
-         *          <w:rPr/>
-         *      </w:pPr>
-         *      <w:r>
-         *          <w:rPr/>
-         *          <w:t>${CLONEME}</w:t>
-         *      </w:r>
-         *  </w:p>
-         * ```
-         */
-        
-        $this->tempDocumentMainPart = $xml->asXml();
-        
-        // Find the xml in between the tags
-        $xmlBlock = null;
-        preg_match
-        (
-            '/'.preg_quote($startNode->asXml(), '/').'(.*?)'.preg_quote($endNode->asXml(), '/').'/is',
-            $this->tempDocumentMainPart,
-            $matches
-        );
-        
-        return $matches;
-    }
-
     /**
      * Replace a block.
      *
