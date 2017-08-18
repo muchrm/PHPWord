@@ -325,7 +325,7 @@ class TemplateProcessor
      * @return string|null
      */
      public function cloneBlock($blockname, $clones = 1, $replace = true, $increment = false) {      
-        $pattern = '|\{(' . $blockname . ')\}(.*)\{(/' . $blockname . ')\}|U';
+        $pattern = '|\$\{(' . $blockname . ')\}(.*)\$\{(/' . $blockname . ')\}|U';
         $xmlBlock = null;
         preg_match(
                 $pattern, $this->tempDocumentMainPart, $matches
